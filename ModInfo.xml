@@ -1,0 +1,18 @@
+<Mod ID="MiniMap">
+  <Compatible>1.11b</Compatible>
+  <Button Standard="F6" ID="Show">
+    <Name>
+      <EN>Show</EN>
+    </Name>
+    <Description>
+      <EN>Show or Hide</EN>
+    </Description>
+  </Button>
+  <Name>
+    <EN>Mini Map</EN>
+  </Name>
+  <Description>
+    <EN>Mini map with compass and ememy locator</EN>
+  </Description>
+  <Version>1.0.0.20</Version>
+</Mod>
