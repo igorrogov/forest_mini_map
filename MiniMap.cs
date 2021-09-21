@@ -12,7 +12,7 @@ namespace MiniMap
     {
 
         // radius of the visible area in the compass, using in-game coordinates
-        private const float COMPASS_IN_GAME_RADIUS = 500;
+        private const float COMPASS_IN_GAME_SIZE = 500;
 
         private const float COMPASS_SIZE_RELATIVE_TO_SCREEN_HEIGHT = 0.60f; // 15% of screen height
 
@@ -30,7 +30,11 @@ namespace MiniMap
 
         private Texture2D enemyMarkerTexture;
 
-        private Texture2D compassTexture;
+        private Texture2D entranceTexture;
+
+        private Texture2D overworldTexture;
+
+        private Texture2D cavesTexture;
 
         private readonly Dictionary<int, GameObject> enemies = new Dictionary<int, GameObject>();
 
@@ -42,19 +46,21 @@ namespace MiniMap
 
         void Awake()
         {
-            ModAPI.Log.Write("mini map started: 10:38");
+            ModAPI.Log.Write("mini map started: 11:04");
         }
 
         void Start()
         {
             try
             {
-                string[] resourceNames = Assembly.GetExecutingAssembly().GetManifestResourceNames();
-                ModAPI.Log.Write("Assembly resources: " + String.Join(", ", resourceNames));
+                // string[] resourceNames = Assembly.GetExecutingAssembly().GetManifestResourceNames();
+                // ModAPI.Log.Write("Assembly resources: " + String.Join(", ", resourceNames));
 
-                compassTexture = LoadTextureFromResource("MiniMap.Compass.png");
                 playerMarkerTexture = LoadTextureFromResource("MiniMap.player_marker.png");
                 enemyMarkerTexture = LoadTextureFromResource("MiniMap.enemy_marker.png");
+                entranceTexture = LoadTextureFromResource("MiniMap.entrance.png");
+                overworldTexture = LoadTextureFromResource("MiniMap.overworld.jpg");
+                cavesTexture = LoadTextureFromResource("MiniMap.caves.jpg");
                 textureLoaded = true;
                 ModAPI.Log.Write("Textures loaded.");
             }
@@ -71,7 +77,7 @@ namespace MiniMap
                 visible = !visible;
             }
 
-            if (visible) 
+            if (visible)
             {
                 FindCannibals();
                 // ModAPI.Log.Write("Found enemies: " + enemies.Count);
@@ -111,25 +117,55 @@ namespace MiniMap
 
             float margin = Screen.height * COMPASS_MARGIN_RELATIVE_TO_SCREEN_HEIGHT;
             float mapSize = Screen.height * COMPASS_SIZE_RELATIVE_TO_SCREEN_HEIGHT;
+            float mapScale = mapSize / COMPASS_IN_GAME_SIZE;
 
             float mapPosX = Screen.width - margin - mapSize;
             float mapPosY = margin;
             float mapCenterX = mapPosX + mapSize / 2;
             float mapCenterY = mapPosY + mapSize / 2;
 
-            float rotationZ = LocalPlayer.Transform.rotation.eulerAngles.y;
+            // opacity: 75%
+            GUI.color = new Color(1.0f, 1.0f, 1.0f, 0.75f);
 
-            // opacity: 60%
-            GUI.color = new Color(1.0f, 1.0f, 1.0f, 0.60f);
+            Texture2D mapTexture = LocalPlayer.IsInCaves ? cavesTexture : overworldTexture;
+            GUI.DrawTextureWithTexCoords(new Rect(mapPosX, mapPosY, mapSize, mapSize), mapTexture, GetPlayerLocationTextCoordinates(), true);
 
-            Matrix4x4 matrix = GUI.matrix;
-            GUIUtility.RotateAroundPivot(180 - rotationZ, new Vector2(mapCenterX, mapCenterY));
-            GUI.DrawTexture(new Rect(mapPosX, mapPosY, mapSize, mapSize), compassTexture, ScaleMode.ScaleToFit, true);
-            GUI.matrix = matrix;
+            //Matrix4x4 matrix = GUI.matrix;
+            //GUIUtility.RotateAroundPivot(180 - rotationZ, new Vector2(mapCenterX, mapCenterY));
+            //GUI.DrawTexture(new Rect(mapPosX, mapPosY, mapSize, mapSize), compassTexture, ScaleMode.ScaleToFit, true);
+            //GUI.matrix = matrix;
 
-            DrawEnemyMarkers(mapSize, mapCenterX, mapCenterY, 180 - rotationZ);
-
+            DrawEnemyMarkers(mapSize, mapCenterX, mapCenterY, mapScale);
+            DrawCaveEntrances(mapSize, mapCenterX, mapCenterY, mapScale);
             DrawPlayerMarker(mapSize, mapCenterX, mapCenterY);
+        }
+
+        // how much the map image is bigger than the actual in game world (1750x2 -> 4096)
+        private const float WORLD_TO_MAP_IMAGE_SCALE_X = 1.17269076305f;
+        private const float WORLD_TO_MAP_IMAGE_SCALE_Y = 1.168f;
+
+        // dimensions of the map image PNG files: 4096 x 4096
+        private const float MAP_IMAGE_SIZE = 4096;
+        private const float MAP_IMAGE_OFFSET_X = 2.5f;
+        private const float MAP_IMAGE_OFFSET_Y = 0.0f;
+
+
+        private Rect GetPlayerLocationTextCoordinates()
+        {
+            Vector2 m = ToMapCoordinates(LocalPlayer.Transform.position);
+            float posX = m.x - COMPASS_IN_GAME_SIZE / 2;
+            float posY = m.y - COMPASS_IN_GAME_SIZE / 2;
+            return new Rect(posX / MAP_IMAGE_SIZE, posY / MAP_IMAGE_SIZE, COMPASS_IN_GAME_SIZE / MAP_IMAGE_SIZE, COMPASS_IN_GAME_SIZE / MAP_IMAGE_SIZE);
+        }
+
+        private Vector2 ToMapCoordinates(Vector3 pos)
+        {
+            // convert to map image coordinates (0,0 -> 4096,4096)
+            float mx = -(pos.x * WORLD_TO_MAP_IMAGE_SCALE_X) + MAP_IMAGE_SIZE / 2 - MAP_IMAGE_OFFSET_X;
+            float my = (pos.z * WORLD_TO_MAP_IMAGE_SCALE_Y) + MAP_IMAGE_SIZE / 2 + MAP_IMAGE_OFFSET_Y;
+            my = MAP_IMAGE_SIZE - my;
+
+            return new Vector2(mx, my);
         }
 
         private void DrawPlayerMarker(float mapSize, float mapCenterX, float mapCenterY)
@@ -138,51 +174,63 @@ namespace MiniMap
 
             float posX = mapCenterX - size / 2;
             float posY = mapCenterY - size / 2;
+            float rotationZ = LocalPlayer.Transform.rotation.eulerAngles.y;
 
-            // player marker (always facing north/up)
+            Matrix4x4 matrix = GUI.matrix;
+            GUIUtility.RotateAroundPivot(rotationZ + 180, new Vector2(mapCenterX, mapCenterY));
             GUI.DrawTexture(new Rect(posX, posY, size, size), playerMarkerTexture, ScaleMode.ScaleToFit, true);
+            GUI.matrix = matrix;
         }
 
-        private void DrawEnemyMarkers(float mapSize, float mapCenterX, float mapCenterY, float mapRotation)
+        private void DrawEnemyMarkers(float mapSize, float mapCenterX, float mapCenterY, float mapScale)
         {
             foreach(GameObject go in enemies.Values)
             {
-                DrawEnemyMarker(mapSize, mapCenterX, mapCenterY, mapRotation, go);
+                DrawMarker(mapSize, mapCenterX, mapCenterY, go, mapScale, ENEMY_MARKER_SIZE_PERCENT, true, enemyMarkerTexture);
             }
         }
 
-        private void DrawEnemyMarker(float mapSize, float mapCenterX, float mapCenterY, float mapRotation, GameObject go)
+        private void DrawCaveEntrances(float mapSize, float mapCenterX, float mapCenterY, float mapScale)
         {
-            float mapRadius = mapSize / 2;
-            float size = mapSize * ENEMY_MARKER_SIZE_PERCENT;
+            foreach (GameObject go in FindCaveEntrances())
+            {
+                DrawMarker(mapSize, mapCenterX, mapCenterY, go, mapScale, PLAYER_MARKER_SIZE_PERCENT, false, entranceTexture);
+            }
+        }
+
+        private void DrawMarker(float mapSize, float mapCenterX, float mapCenterY, GameObject go, float mapScale, float markerSizePercent, bool drawRotation, Texture2D texture)
+        {
+            float size = mapSize * markerSizePercent;
 
             float relX = -(go.transform.position.x - LocalPlayer.Transform.position.x);
             float relY = go.transform.position.z - LocalPlayer.Transform.position.z;
             Vector2 vec = new Vector2(relX, relY);
-            float magnitude = vec.magnitude;
-            if (magnitude > COMPASS_IN_GAME_RADIUS)
+
+            if (Math.Abs(relX) > COMPASS_IN_GAME_SIZE / 2 || Math.Abs(relY) > COMPASS_IN_GAME_SIZE / 2)
             {
                 // not visible on the map
                 return;
             }
 
-            float relativeMagnitude = magnitude / COMPASS_IN_GAME_RADIUS;
-            vec = vec.normalized * mapRadius * relativeMagnitude;
-
-            // ModAPI.Log.Write("[VIS] GUI vec: " + vec);
+            vec *= mapScale;
 
             float centerX = mapCenterX + vec.x;
             float centerY = mapCenterY + vec.y;
             float posX = centerX - size / 2;
             float posY = centerY - size / 2;
 
-            float rotation = go.GetComponentInChildren<Animator>().rootRotation.eulerAngles.y;
-
-            Matrix4x4 matrix = GUI.matrix;
-            GUIUtility.RotateAroundPivot(rotation + 180, new Vector2(centerX, centerY));
-            GUIUtility.RotateAroundPivot(mapRotation, new Vector2(mapCenterX, mapCenterY));
-            GUI.DrawTexture(new Rect(posX, posY, size, size), enemyMarkerTexture, ScaleMode.ScaleToFit, true);
-            GUI.matrix = matrix;
+            if (drawRotation)
+            {
+                float rotation = go.GetComponentInChildren<Animator>().rootRotation.eulerAngles.y;
+                Matrix4x4 matrix = GUI.matrix;
+                GUIUtility.RotateAroundPivot(rotation + 180, new Vector2(centerX, centerY));
+                GUI.DrawTexture(new Rect(posX, posY, size, size), texture, ScaleMode.ScaleToFit, true);
+                GUI.matrix = matrix;
+            }
+            else
+            {
+                GUI.DrawTexture(new Rect(posX, posY, size, size), texture, ScaleMode.ScaleToFit, true);
+            }
         }
 
         private void FindCannibals()
@@ -205,6 +253,40 @@ namespace MiniMap
                     enemies[key] = c;
                 }
             }
+        }
+
+        private List<GameObject> FindCaveEntrances()
+        {
+            List<GameObject> list = new List<GameObject>();
+
+            if (Scene.SceneTracker == null)
+            {
+                return list;
+            }
+
+            foreach (var ce in Scene.SceneTracker.caveEntrances)
+            {
+                GameObject go = ce.blackBackingGo;
+                if (go != null)
+                {
+                    list.Add(go);
+                    continue;
+                }
+                go = ce.fadeToDarkGo;
+                if (go != null)
+                {
+                    list.Add(go);
+                    continue;
+                }
+                go = ce.blackBackingFadeGo;
+                if (go != null)
+                {
+                    list.Add(go);
+                    continue;
+                }
+            }
+
+            return list;
         }
 
     }
