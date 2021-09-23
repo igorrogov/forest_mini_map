@@ -12,17 +12,27 @@ namespace MiniMap
     {
 
         // radius of the visible area in the compass, using in-game coordinates
-        private const float COMPASS_IN_GAME_SIZE = 500;
+        private const float MAP_IN_GAME_SIZE = 500;
 
-        private const float COMPASS_SIZE_RELATIVE_TO_SCREEN_HEIGHT = 0.60f; // 15% of screen height
+        private const float MAP_SIZE_RELATIVE_TO_SCREEN_HEIGHT = 0.50f; // 50% of screen height
 
-        private const float COMPASS_MARGIN_RELATIVE_TO_SCREEN_HEIGHT = 0.02f; // 2% of screen height
+        private const float MAP_MARGIN_RELATIVE_TO_SCREEN_HEIGHT = 0.05f; // 5% of screen height
 
-        private const float PLAYER_MARKER_SIZE_PERCENT = 0.05f; // 5% of compass size
+        private const float PLAYER_MARKER_SIZE_PERCENT = 0.05f; // 5% of map size
 
-        private const float ENEMY_MARKER_SIZE_PERCENT = 0.03f; // 3% of compass size
+        private const float ENEMY_MARKER_SIZE_PERCENT = 0.03f; // 3% of map size
 
+        private float mapSizeRelativeToScreenHeight = MAP_SIZE_RELATIVE_TO_SCREEN_HEIGHT;
+
+        private float mapOpacity = 0.75f; // 75%
+
+        private float mapInGameSize = MAP_IN_GAME_SIZE;
+
+        // true if the map is visible
         private bool visible = false;
+
+        // true if we are in the Settings mode (can use mouse to change settings)
+        private bool inSettings = false;
 
         private bool textureLoaded = false;
 
@@ -46,7 +56,7 @@ namespace MiniMap
 
         void Awake()
         {
-            ModAPI.Log.Write("mini map started: 11:04");
+            ModAPI.Log.Write("mini map started: 11:08");
         }
 
         void Start()
@@ -79,8 +89,20 @@ namespace MiniMap
 
             if (visible)
             {
+                if (ModAPI.Input.GetButtonDown("Settings"))
+                {
+                    inSettings = !inSettings;
+                    if (inSettings)
+                    {
+                        LocalPlayer.FpCharacter.LockView();
+                    }
+                    else
+                    {
+                        LocalPlayer.FpCharacter.UnLockView();
+                    }
+                }
+
                 FindCannibals();
-                // ModAPI.Log.Write("Found enemies: " + enemies.Count);
             }
         }
 
@@ -115,17 +137,17 @@ namespace MiniMap
                 return;
             }
 
-            float margin = Screen.height * COMPASS_MARGIN_RELATIVE_TO_SCREEN_HEIGHT;
-            float mapSize = Screen.height * COMPASS_SIZE_RELATIVE_TO_SCREEN_HEIGHT;
-            float mapScale = mapSize / COMPASS_IN_GAME_SIZE;
+            float margin = Screen.height * MAP_MARGIN_RELATIVE_TO_SCREEN_HEIGHT;
+            float mapSize = Screen.height * mapSizeRelativeToScreenHeight;
+            float mapScale = mapSize / mapInGameSize;
 
             float mapPosX = Screen.width - margin - mapSize;
             float mapPosY = margin;
             float mapCenterX = mapPosX + mapSize / 2;
             float mapCenterY = mapPosY + mapSize / 2;
 
-            // opacity: 75%
-            GUI.color = new Color(1.0f, 1.0f, 1.0f, 0.75f);
+            // opacity: 75% by default
+            GUI.color = new Color(1.0f, 1.0f, 1.0f, mapOpacity);
 
             Texture2D mapTexture = LocalPlayer.IsInCaves ? cavesTexture : overworldTexture;
             GUI.DrawTextureWithTexCoords(new Rect(mapPosX, mapPosY, mapSize, mapSize), mapTexture, GetPlayerLocationTextCoordinates(), true);
@@ -138,7 +160,56 @@ namespace MiniMap
             DrawEnemyMarkers(mapSize, mapCenterX, mapCenterY, mapScale);
             DrawCaveEntrances(mapSize, mapCenterX, mapCenterY, mapScale);
             DrawPlayerMarker(mapSize, mapCenterX, mapCenterY);
+
+            if (inSettings)
+            {
+                DrawControls(margin);
+            }
         }
+
+        private void DrawControls(float areaSize)
+        {
+            float posX = Screen.width - areaSize;
+            float posY = areaSize;
+            float buttonSize = areaSize * 0.8f;
+            float margin = areaSize * 0.1f;
+
+            if (GUI.Button(new Rect(posX + margin, posY, buttonSize, buttonSize), "-"))
+            {
+                mapSizeRelativeToScreenHeight -= 0.05f; // -5%
+            }
+
+            posY += margin + buttonSize;
+            if (GUI.Button(new Rect(posX + margin, posY, buttonSize, buttonSize), "+"))
+            {
+                mapSizeRelativeToScreenHeight += 0.05f; // +5%
+            }
+
+            posY += margin * 3 + buttonSize;
+            if (GUI.Button(new Rect(posX + margin, posY, buttonSize, buttonSize), "-"))
+            {
+                mapOpacity -= 0.05f; // -5%
+            }
+
+            posY += margin + buttonSize;
+            if (GUI.Button(new Rect(posX + margin, posY, buttonSize, buttonSize), "+"))
+            {
+                mapOpacity += 0.05f; // +5%
+            }
+
+            posY += margin * 3 + buttonSize;
+            if (GUI.Button(new Rect(posX + margin, posY, buttonSize, buttonSize), "-"))
+            {
+                mapInGameSize += 100;
+            }
+
+            posY += margin + buttonSize;
+            if (GUI.Button(new Rect(posX + margin, posY, buttonSize, buttonSize), "+"))
+            {
+                mapInGameSize -= 100;
+            }
+        }
+
 
         // how much the map image is bigger than the actual in game world (1750x2 -> 4096)
         private const float WORLD_TO_MAP_IMAGE_SCALE_X = 1.17269076305f;
@@ -153,9 +224,9 @@ namespace MiniMap
         private Rect GetPlayerLocationTextCoordinates()
         {
             Vector2 m = ToMapCoordinates(LocalPlayer.Transform.position);
-            float posX = m.x - COMPASS_IN_GAME_SIZE / 2;
-            float posY = m.y - COMPASS_IN_GAME_SIZE / 2;
-            return new Rect(posX / MAP_IMAGE_SIZE, posY / MAP_IMAGE_SIZE, COMPASS_IN_GAME_SIZE / MAP_IMAGE_SIZE, COMPASS_IN_GAME_SIZE / MAP_IMAGE_SIZE);
+            float posX = m.x - mapInGameSize / 2;
+            float posY = m.y - mapInGameSize / 2;
+            return new Rect(posX / MAP_IMAGE_SIZE, posY / MAP_IMAGE_SIZE, mapInGameSize / MAP_IMAGE_SIZE, mapInGameSize / MAP_IMAGE_SIZE);
         }
 
         private Vector2 ToMapCoordinates(Vector3 pos)
@@ -206,7 +277,7 @@ namespace MiniMap
             float relY = go.transform.position.z - LocalPlayer.Transform.position.z;
             Vector2 vec = new Vector2(relX, relY);
 
-            if (Math.Abs(relX) > COMPASS_IN_GAME_SIZE / 2 || Math.Abs(relY) > COMPASS_IN_GAME_SIZE / 2)
+            if (Math.Abs(relX) > mapInGameSize / 2 || Math.Abs(relY) > mapInGameSize / 2)
             {
                 // not visible on the map
                 return;

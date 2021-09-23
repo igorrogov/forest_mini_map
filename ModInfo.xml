@@ -8,11 +8,19 @@
       <EN>Show or Hide</EN>
     </Description>
   </Button>
+  <Button Standard="F5" ID="Settings">
+    <Name>
+      <EN>Settings</EN>
+    </Name>
+    <Description>
+      <EN>Show settings</EN>
+    </Description>
+  </Button>
   <Name>
     <EN>Mini Map</EN>
   </Name>
   <Description>
     <EN>Mini map with compass and ememy locator</EN>
   </Description>
-  <Version>1.0.0.34</Version>
+  <Version>1.0.0.37</Version>
 </Mod>
