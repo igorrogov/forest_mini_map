@@ -28,6 +28,7 @@
 <EmbeddedResource Include="overworld.jpg"  />
 <EmbeddedResource Include="entrance.png"  />
 <EmbeddedResource Include="caves.jpg"  />
+<EmbeddedResource Include="other_player_marker.png"  />
 
   </ItemGroup>
   <ItemGroup>

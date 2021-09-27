@@ -38,6 +38,8 @@ namespace MiniMap
 
         private Texture2D playerMarkerTexture;
 
+        private Texture2D otherPlayerMarkerTexture;
+
         private Texture2D enemyMarkerTexture;
 
         private Texture2D entranceTexture;
@@ -56,7 +58,7 @@ namespace MiniMap
 
         void Awake()
         {
-            ModAPI.Log.Write("mini map started: 11:08");
+            ModAPI.Log.Write("mini map started: 10:52");
         }
 
         void Start()
@@ -67,6 +69,7 @@ namespace MiniMap
                 // ModAPI.Log.Write("Assembly resources: " + String.Join(", ", resourceNames));
 
                 playerMarkerTexture = LoadTextureFromResource("MiniMap.player_marker.png");
+                otherPlayerMarkerTexture = LoadTextureFromResource("MiniMap.other_player_marker.png");
                 enemyMarkerTexture = LoadTextureFromResource("MiniMap.enemy_marker.png");
                 entranceTexture = LoadTextureFromResource("MiniMap.entrance.png");
                 overworldTexture = LoadTextureFromResource("MiniMap.overworld.jpg");
@@ -160,6 +163,7 @@ namespace MiniMap
             DrawEnemyMarkers(mapSize, mapCenterX, mapCenterY, mapScale);
             DrawCaveEntrances(mapSize, mapCenterX, mapCenterY, mapScale);
             DrawPlayerMarker(mapSize, mapCenterX, mapCenterY);
+            DrawOtherPlayers(mapSize, mapCenterX, mapCenterY, mapScale);
 
             if (inSettings)
             {
@@ -269,6 +273,20 @@ namespace MiniMap
             }
         }
 
+        private void DrawOtherPlayers(float mapSize, float mapCenterX, float mapCenterY, float mapScale)
+        {
+            if (!BoltNetwork.isRunning || Scene.SceneTracker == null || Scene.SceneTracker.allPlayerEntities == null)
+            {
+                // nothing to show
+                return;
+            }
+
+            foreach (GameObject go in FindOtherPlayers())
+            {
+                DrawMarker(mapSize, mapCenterX, mapCenterY, go, mapScale, PLAYER_MARKER_SIZE_PERCENT, false, otherPlayerMarkerTexture);
+            }
+        }
+
         private void DrawMarker(float mapSize, float mapCenterX, float mapCenterY, GameObject go, float mapScale, float markerSizePercent, bool drawRotation, Texture2D texture)
         {
             float size = mapSize * markerSizePercent;
@@ -290,16 +308,24 @@ namespace MiniMap
             float posX = centerX - size / 2;
             float posY = centerY - size / 2;
 
+            bool drawn = false;
             if (drawRotation)
             {
-                float rotation = go.GetComponentInChildren<Animator>().rootRotation.eulerAngles.y;
-                Matrix4x4 matrix = GUI.matrix;
-                GUIUtility.RotateAroundPivot(rotation + 180, new Vector2(centerX, centerY));
-                GUI.DrawTexture(new Rect(posX, posY, size, size), texture, ScaleMode.ScaleToFit, true);
-                GUI.matrix = matrix;
+                Animator animator = go.GetComponentInChildren<Animator>();
+                if (animator != null && animator.rootRotation != null)
+                {
+                    float rotation = animator.rootRotation.eulerAngles.y;
+                    Matrix4x4 matrix = GUI.matrix;
+                    GUIUtility.RotateAroundPivot(rotation + 180, new Vector2(centerX, centerY));
+                    GUI.DrawTexture(new Rect(posX, posY, size, size), texture, ScaleMode.ScaleToFit, true);
+                    GUI.matrix = matrix;
+                    drawn = true;
+                }
             }
-            else
+
+            if (!drawn)
             {
+                // rotation is not available
                 GUI.DrawTexture(new Rect(posX, posY, size, size), texture, ScaleMode.ScaleToFit, true);
             }
         }
@@ -324,6 +350,8 @@ namespace MiniMap
                     enemies[key] = c;
                 }
             }
+
+            //TODO: find cannibals in multiplayer
         }
 
         private List<GameObject> FindCaveEntrances()
@@ -360,5 +388,17 @@ namespace MiniMap
             return list;
         }
 
+        private List<GameObject> FindOtherPlayers()
+        {
+            List<GameObject> list = new List<GameObject>();
+            foreach (var p in Scene.SceneTracker.allPlayerEntities)
+            {
+                if (p.IsAttached() && p.StateIs<IPlayerState>() && LocalPlayer.Entity != p && p.gameObject.activeSelf && p.gameObject.activeInHierarchy && p.GetComponent<BoltPlayerSetup>() != null)
+                {
+                    list.Add(p);
+                }
+            }
+            return list;
+        }
     }
 }
