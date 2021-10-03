@@ -58,7 +58,7 @@ namespace MiniMap
 
         void Awake()
         {
-            ModAPI.Log.Write("mini map started: 10:52");
+            ModAPI.Log.Write("mini map started: 11:10");
         }
 
         void Start()
@@ -339,7 +339,20 @@ namespace MiniMap
 
             enemies.Clear();
 
-            List<GameObject> activeCannibals = LocalPlayer.IsInCaves ? Scene.MutantControler.ActiveCaveCannibals : Scene.MutantControler.ActiveWorldCannibals;
+            List<GameObject> activeCannibals;
+            if (GameSetup.IsMpClient)
+            {
+                activeCannibals = LiveEnemyForClients.liveEnemies;
+            }
+            else if (LocalPlayer.IsInCaves)
+            {
+                activeCannibals = Scene.MutantControler.ActiveCaveCannibals;
+            }
+            else
+            {
+                activeCannibals = Scene.MutantControler.ActiveWorldCannibals;
+            }
+
             activeCannibals.ForEach(c => enemies[c.GetInstanceID()] = c);
 
             foreach (GameObject c in Scene.MutantControler.activeInstantSpawnedCannibals)
@@ -401,4 +414,60 @@ namespace MiniMap
             return list;
         }
     }
+
+    public class LiveEnemyForClients : MonoBehaviour
+    {
+        internal static List<GameObject> liveEnemies;
+
+        [ExecuteOnGameStart]
+        public static void Init()
+        {
+            liveEnemies = new List<GameObject>();
+        }
+
+        private void OnEnable()
+        {
+            if (!liveEnemies.Contains(base.gameObject))
+            {
+                liveEnemies.Add(base.gameObject);
+            }
+        }
+
+        private void Start()
+        {
+            if (!liveEnemies.Contains(base.gameObject))
+            {
+                liveEnemies.Add(base.gameObject);
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (liveEnemies.Contains(base.gameObject))
+            {
+                liveEnemies.Remove(base.gameObject);
+            }
+        }
+
+        private void OnDelete()
+        {
+            if (liveEnemies.Contains(base.gameObject))
+            {
+                liveEnemies.Remove(base.gameObject);
+            }
+        }
+    }
+
+    public class MutantAINetworkExtension : mutantAI_net
+    {
+        protected override void Start()
+        {
+            if (base.transform.root.gameObject.GetComponent<LiveEnemyForClients>() == null)
+            {
+                base.transform.root.gameObject.AddComponent<LiveEnemyForClients>();
+            }
+            base.Start();
+        }
+    }
+
 }
